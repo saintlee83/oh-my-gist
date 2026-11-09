@@ -28,6 +28,27 @@ export class GraphQLError extends Error {
   }
 }
 
+export class MissingScopes extends Error {
+  missing: string[];
+  constructor(missing: string[]) {
+    super(
+      `This token is missing the ${missing.join(', ')} scope${missing.length > 1 ? 's' : ''}. ` +
+        'Without them, private work would silently drop out of your public cards, so nothing was changed. ' +
+        'Fix it with `gh auth refresh -s repo,read:org,gist`, or create a classic token with those scopes.',
+    );
+    this.name = 'MissingScopes';
+    this.missing = missing;
+  }
+}
+
+/** Broader scopes that also grant the one being checked. */
+const IMPLIED_BY: Record<string, string[]> = { 'read:org': ['write:org', 'admin:org'] };
+
+/** Actions logs are public on a public repo, and API errors can quote private names. */
+export function redactQuoted(message: string): string {
+  return message.replace(/'[^']*'|"[^"]*"/g, "'[redacted]'");
+}
+
 /**
  * The first two are explicit opt-ins. GITHUB_TOKEN comes last because the
  * workflow token Actions provides cannot write gists or read private org repos.
@@ -71,6 +92,23 @@ export class GitHubClient {
     this.baseUrl = options.baseUrl ?? 'https://api.github.com';
     this.sleep = options.sleep ?? defaultSleep;
     this.maxAttempts = options.maxAttempts ?? 5;
+  }
+
+  /**
+   * Classic and OAuth tokens report their scopes on every response. Fine-grained
+   * tokens report none, so they can't be checked here and count as having everything.
+   */
+  missingScopes(required: string[]): string[] {
+    if (this.scopes === null || /^(github_pat_|ghs_)/.test(this.token)) return [];
+    const granted = new Set(this.scopes.split(',').map((scope) => scope.trim()));
+    return required.filter(
+      (scope) => !granted.has(scope) && !(IMPLIED_BY[scope] ?? []).some((broader) => granted.has(broader)),
+    );
+  }
+
+  assertScopes(required: string[]): void {
+    const missing = this.missingScopes(required);
+    if (missing.length) throw new MissingScopes(missing);
   }
 
   private async send(path: string, init: RequestInit, resource: string): Promise<Response> {

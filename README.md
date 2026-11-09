@@ -16,7 +16,7 @@ The ultimate gist profile for hackers. It traces your real activity across perso
 | 🤝 **Top coauthored with** | Who you co-author with, by AI model and by teammate |
 | 🔥 **Pulse** | Streaks, peak day, AI-assisted share, merge and review speed |
 
-Each card leads with a five-line summary, which is all a pinned gist shows. The rest of the file holds the full tables. A separate hub gist collects everything, plus an SVG dashboard you can embed in your profile README.
+Each card leads with a five-line summary, which is all a pinned gist shows. The rest of the file holds the full tables. A separate hub gist collects everything, plus an SVG dashboard you can [embed in your profile README](#add-the-dashboard-to-your-profile-readme).
 
 ## Choose how to run it
 
@@ -56,25 +56,40 @@ node src/cli.ts schedule --install   # refresh every 6 hours; --uninstall remove
 ## Run it from a fork
 
 1. **Fork this repository**, then open the fork's **Actions** tab and enable workflows.
-2. **Create a [classic personal access token](https://github.com/settings/tokens)** with the `repo`, `read:org` and `gist` scopes. If an organization uses SAML SSO, authorize the token for it too. Add the token as a secret:
+2. **Create a [classic personal access token](https://github.com/settings/tokens)** with the `repo`, `read:org` and `gist` scopes. If an organization uses SAML SSO, authorize the token for it too. Add the token as a **repository secret**. An environment secret won't work, because the workflow doesn't use an environment.
    ```sh
    gh secret set OH_MY_GIST_TOKEN -R <you>/oh-my-gist
    ```
+   In the browser, that's **Settings > Secrets and variables > Actions > New repository secret**.
 3. **Set your timezone**, because Actions runners use UTC:
    ```sh
    gh variable set OMG_TIMEZONE --body Asia/Seoul -R <you>/oh-my-gist
    ```
-4. **Create the gists.** In the **Actions** tab, open **Update gist profile**, choose **Run workflow**, and tick **Create the gists**. You can also run:
+4. **Check it without changing anything.** The log shows how many commits and repos your token can see, so you can spot a missing permission:
+   ```sh
+   gh workflow run oh-my-gist.yml -f dry_run=true -R <you>/oh-my-gist
+   ```
+5. **Create the gists.** In the **Actions** tab, open **Update gist profile**, choose **Run workflow**, and tick **Create the gists**. You can also run:
    ```sh
    gh workflow run oh-my-gist.yml -f create_gists=true -R <you>/oh-my-gist
    ```
-5. **Turn on the schedule:**
+6. **Turn on the schedule:**
    ```sh
    gh variable set OH_MY_GIST_ENABLED --body true -R <you>/oh-my-gist
    ```
-6. **Pin your cards** from your profile.
+7. **Pin your cards** from your profile.
 
-The `repo` scope is broad because reading private repositories requires it. GitHub doesn't expose secrets to pull requests from other forks, and the workflow only runs on a schedule or by hand.
+The `repo` scope is broad because reading private repositories requires it. GitHub doesn't expose secrets to pull requests from other forks, and the workflow only runs on a schedule or by hand. A classic token that lacks a required scope stops the run before anything changes. Fine-grained tokens don't report their permissions, so they can't be checked this way.
+
+## Add the dashboard to your profile README
+
+Publishing prints a line like this. Paste it into the `README.md` of the repository named after your username:
+
+```markdown
+![Dashboard](https://gist.githubusercontent.com/<you>/<hub-gist-id>/raw/dashboard.svg)
+```
+
+The URL stays the same, so the image updates whenever the gist does, within a few minutes. It's a static image with no hover, and every value is also in the cards.
 
 ## Why the numbers differ from other stats tools
 

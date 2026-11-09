@@ -15,6 +15,10 @@ on:
         description: Create the gists (first run only)
         type: boolean
         default: false
+      dry_run:
+        description: Check everything without changing any gist
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -49,4 +53,4 @@ jobs:
           restore-keys: omg-churn-
 
       - name: Collect and publish
-        run: node src/cli.ts run --github-only ${{ inputs.create_gists && '--yes' || '--update-only' }}
+        run: node src/cli.ts run --github-only ${{ inputs.create_gists && '--yes' || '--update-only' }} ${{ inputs.dry_run && '--dry-run' || '' }}

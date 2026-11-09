@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadConfig, type Config } from './config.ts';
-import { GitHubClient, resolveToken } from './github/client.ts';
+import { GitHubClient, redactQuoted, resolveToken } from './github/client.ts';
 import { collectGitHub } from './github/collect.ts';
 import {
   assertCreationAllowed,
@@ -148,6 +148,7 @@ function describe(result: PublishResult, spec: GistSpec): string {
 async function publish(config: Config, flags: Flags): Promise<void> {
   const { client } = makeClient();
   const gists = await listGists(client);
+  client.assertScopes(['gist']);
 
   // The published ledger backs up history and feeds CI runs, which have no local logs.
   const tokenFile = 'oh-my-gist-tokens.txt';
@@ -397,7 +398,8 @@ main().catch((error: unknown) => {
     for (const spec of error.specs) console.error(`  ${spec.description}`);
     console.error('\nNothing was published. Review out/preview.html, then re-run with --yes.');
   } else {
-    console.error(error instanceof Error ? error.message : error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(process.env.CI ? redactQuoted(message) : message);
   }
   process.exitCode = 1;
 });
