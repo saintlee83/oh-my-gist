@@ -5,6 +5,7 @@ import {
   clip,
   commas,
   compact,
+  displayWidth,
   hours,
   money,
   padEnd,
@@ -94,7 +95,7 @@ function contributionsCard(github: GitHubMetrics): Card {
 
   return {
     key: 'contributions',
-    title: `⚡ Contributions: ${compact(counts.attributed)} across ${github.coverage.reposWithCommits} repos`,
+    title: `⚡ Contributions: ${compact(counts.calendar)} on the GitHub graph`,
     filename: 'oh-my-gist-contributions.txt',
     hero,
     details,
@@ -246,14 +247,24 @@ function churnCard(github: GitHubMetrics): Card {
 }
 
 function shortModel(model: string): string {
-  return model.replace(/^claude-/, '');
+  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '');
 }
 
+const TOOL_NAMES: Record<string, string> = { claude: 'Claude', codex: 'Codex' };
+const toolName = (tool: string) => TOOL_NAMES[tool] ?? tool;
+const SOURCE_LABELS = {
+  machine: 'its own statistics, this machine',
+  account: 'your account, every device',
+  logs: 'local logs, this machine',
+};
+
 function tokensCard(tokens: TokenMetrics): Card {
-  const costLabel = tokens.unpricedModels.length ? `≥${money(tokens.cost)}` : `≈${money(tokens.cost)}`;
-  const hero = [
-    clip(`${compact(tokens.total)} tokens · ${compact(tokens.fresh)} uncached · ${costLabel} API`, CARD_WIDTH),
-  ];
+  const isMinimum = tokens.unpricedModels.length > 0 || tokens.unattributed > 0;
+  const costLabel = `${isMinimum ? '≥' : '≈'}${money(tokens.cost)}`;
+  const perTool = tokens.tools.map((row) => `${toolName(row.tool)} ${compact(row.total)}`).join(' ');
+  // The card title already says "tokens", so the word goes first when space is tight.
+  const headline = `${compact(tokens.total)} tokens · ${costLabel} API · ${perTool}`;
+  const hero = [clip(displayWidth(headline) <= CARD_WIDTH ? headline : `${compact(tokens.total)} · ${costLabel} API · ${perTool}`, CARD_WIDTH)];
   for (const row of tokens.models.slice(0, 3)) {
     const share = tokens.total ? row.total / tokens.total : 0;
     const cost = row.cost === null ? '   n/a' : padStart(money(row.cost), 6);
@@ -262,15 +273,23 @@ function tokensCard(tokens: TokenMetrics): Card {
     );
   }
   const recent = tokens.daily.slice(-30).map((day) => day.total);
-  const perCommit = tokens.last30.perCommit;
-  const tail = perCommit ? ` ${compact(perCommit)}/commit` : ` ${compact(tokens.last30.total)}`;
-  hero.push(`30d ${sparkline(recent)}${tail}`.slice(0, CARD_WIDTH));
+  hero.push(`30d ${sparkline(recent)} ${compact(tokens.last30.total)}`.slice(0, CARD_WIDTH));
 
+  const monthTools = tokens.tools.map((row) => row.tool);
   const details = [
+    'BY TOOL',
+    ...table(
+      [
+        ['Tool', 'Total', 'API cost', 'Source', 'Through'],
+        ...tokens.tools.map((row) => [toolName(row.tool), compact(row.total), money(row.cost), SOURCE_LABELS[row.scope], row.asOf ?? '-']),
+      ],
+      ['l', 'r', 'r', 'l', 'l'],
+    ),
+    '',
     'BY MODEL',
     ...table(
       [
-        ['Model', 'Total', 'Input', 'Output', 'Cache read', 'Cache write', 'Responses', 'API cost'],
+        ['Model', 'Total', 'Input', 'Output', 'Cache read', 'Cache write', 'API cost'],
         ...tokens.models.map((row) => [
           row.model,
           compact(row.total),
@@ -278,42 +297,40 @@ function tokensCard(tokens: TokenMetrics): Card {
           compact(row.output),
           compact(row.cacheRead),
           compact(row.cacheWrite),
-          commas(row.messages),
           row.cost === null ? 'n/a' : money(row.cost),
         ]),
+        ...(tokens.unattributed > 0 ? [['Model unknown', compact(tokens.unattributed), '-', '-', '-', '-', 'n/a']] : []),
       ],
-      ['l', 'r', 'r', 'r', 'r', 'r', 'r', 'r'],
-    ),
-    '',
-    'BY TOOL',
-    ...table(
-      [
-        ['Tool', 'Total', 'Uncached', 'API cost'],
-        ...tokens.tools.map((row) => [row.tool, compact(row.total), compact(row.fresh), money(row.cost)]),
-      ],
-      ['l', 'r', 'r', 'r'],
+      ['l', 'r', 'r', 'r', 'r', 'r', 'r'],
     ),
     '',
     'BY MONTH',
     ...table(
       [
-        ['Month', 'Total', 'Uncached', 'API cost'],
-        ...tokens.monthly.map((row) => [row.month, compact(row.total), compact(row.fresh), money(row.cost)]),
+        ['Month', ...monthTools.map(toolName), 'Total'],
+        ...tokens.monthly.map((row) => [row.month, ...monthTools.map((tool) => compact(row.byTool[tool] ?? 0)), compact(row.total)]),
+        ...(tokens.undated > 0 ? [['Earlier', ...monthTools.map(() => ''), compact(tokens.undated)]] : []),
       ],
-      ['l', 'r', 'r', 'r'],
+      ['l', ...monthTools.map(() => 'r' as const), 'r'],
     ),
     '',
     'SUMMARY',
-    `Cache hit rate   ${percent(tokens.cacheShare)}`,
-    `Active days      ${commas(tokens.activeDays)} since ${tokens.firstDay}`,
+    `Cache hit rate   ${percent(tokens.cacheShare)}${tokens.unattributed > 0 ? ' (where the breakdown is known)' : ''}`,
+    `Active days      ${commas(tokens.activeDays)}${tokens.firstDay ? ` since ${tokens.firstDay}` : ''}`,
     ...(tokens.peak ? [`Peak day         ${tokens.peak.date} (${compact(tokens.peak.total)})`] : []),
-    `Last 30 days     ${compact(tokens.last30.total)} total, ${compact(tokens.last30.fresh)} uncached, ${money(tokens.last30.cost)}`,
+    `Last 30 days     ${compact(tokens.last30.total)}`,
+    ...(tokens.last30.perCommit ? [`Uncached/commit  ${compact(tokens.last30.perCommit)} over 30 days, from this machine's logs`] : []),
     '',
     'HOW THIS IS COUNTED',
-    'Read from local Claude Code and Codex logs, one count per model response. Only',
-    'daily totals per model leave the machine, never prompts, code or paths.',
-    '"API" is what this usage would cost at public list prices, not what was paid.',
-    ...(tokens.unpricedModels.length ? [`No public price for: ${tokens.unpricedModels.join(', ')}. Excluded from cost.`] : []),
+    "Claude Code: its own lifetime statistics on this machine, which survive log cleanup.",
+    "Codex: your account's lifetime total, the figure behind /usage, across every device.",
+    'So the two have different reach, and usage on other machines may be missing for Claude.',
+    "Codex's model split comes from local logs, so tokens outside them have no known model.",
+    'Without those sources, this falls back to counting local logs, once per model response.',
+    'Only totals per day and model leave the machine, never prompts, code or paths.',
+    '"API" is what this usage would cost at public list prices, not what was paid. It is a',
+    'minimum when "≥" appears, because tokens without a known model or price are left out.',
+    ...(tokens.unpricedModels.length ? [`No public price for: ${tokens.unpricedModels.join(', ')}.`] : []),
   ];
 
   return {

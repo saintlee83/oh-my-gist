@@ -173,6 +173,21 @@ test('a token card alone renders without GitHub data', () => {
   assert.match(cards[0].details.join('\n'), /No public price for: an-unpriced-model, fourth-model/);
 });
 
+test('the headline matches the GitHub graph, with the itemized part labelled', () => {
+  const snapshot = emptySnapshot({
+    calendar: [
+      { date: '2026-09-01', count: 1933 },
+      { date: '2026-10-01', count: 1202 },
+    ],
+    commits: [{ oid: 'a', at: '2026-09-01T00:00:00Z', scope: 'org', add: 0, del: 0, merge: false, ai: null, kind: null }],
+  });
+  const metrics = computeMetrics(snapshot, null, {}, TZ, NOW);
+  const svg = renderDashboard(metrics);
+  assert.ok(svg.includes('>3,135</text>'), 'the graph total is the headline');
+  assert.ok(svg.includes('1 itemized across'));
+  assert.equal(buildCards(metrics)[0].title, '⚡ Contributions: 3.1k on the GitHub graph');
+});
+
 test('the dashboard is well-formed and escapes text', () => {
   const snapshot = extremeSnapshot();
   snapshot.languages[0].name = 'A<b>&"C';
