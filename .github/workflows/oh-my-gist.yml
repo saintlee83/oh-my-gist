@@ -1,0 +1,52 @@
+name: Update gist profile
+
+# Keeps the GitHub cards fresh from a fork. See "Run it from a fork" in the README.
+# Scheduled runs stay off until the OH_MY_GIST_ENABLED variable is set to true.
+#
+# The token card is local-only, because AI logs live on your machine. A run here
+# leaves it alone and reuses its published numbers in the dashboard.
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      create_gists:
+        description: Create the gists (first run only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oh-my-gist
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.event_name == 'workflow_dispatch' || vars.OH_MY_GIST_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      OMG_HOME: .omg-state
+      OH_MY_GIST_TOKEN: ${{ secrets.OH_MY_GIST_TOKEN }}
+      OMG_TIMEZONE: ${{ vars.OMG_TIMEZONE }}
+      OMG_CONFIG_JSON: ${{ vars.OMG_CONFIG_JSON }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # Holds only commit hashes and per-language line counts, no names.
+      - name: Restore churn cache
+        uses: actions/cache@v4
+        with:
+          path: .omg-state/churn-cache.json
+          key: omg-churn-${{ github.run_id }}
+          restore-keys: omg-churn-
+
+      - name: Collect and publish
+        run: node src/cli.ts run --github-only ${{ inputs.create_gists && '--yes' || '--update-only' }}

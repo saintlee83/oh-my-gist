@@ -1,0 +1,37 @@
+{
+  "name": "oh-my-gist",
+  "version": "0.1.0",
+  "description": "The ultimate pinned-gist profile: contributions, rhythm, languages, line churn and AI token usage across personal repos, gists and every org.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saintlee83/oh-my-gist.git"
+  },
+  "homepage": "https://github.com/saintlee83/oh-my-gist#readme",
+  "bugs": "https://github.com/saintlee83/oh-my-gist/issues",
+  "keywords": [
+    "github",
+    "gist",
+    "pinned-gist",
+    "github-profile",
+    "github-stats",
+    "developer-stats",
+    "ai-tokens",
+    "claude-code",
+    "codex"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "omg": "node src/cli.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
