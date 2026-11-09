@@ -3,9 +3,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { TokenLedger, UsageTuple } from '../types.ts';
+import type { TokenLedger, TokenTotals, UsageTuple } from '../types.ts';
 import { zoned } from '../util/time.ts';
 import { mergeEvents, parseClaudeLog, parseCodexLog, type Tool, type UsageEvent } from './parsers.ts';
+import { mergeTotals } from './totals.ts';
 
 export const EMPTY_LEDGER: TokenLedger = { version: 1, days: {} };
 
@@ -178,7 +179,8 @@ export function mergeLedgers(...ledgers: TokenLedger[]): TokenLedger {
       }
     }
   }
-  return { version: 1, days };
+  const totals = mergeTotals(...ledgers.map((ledger) => ledger.totals));
+  return totals ? { version: 1, days, totals } : { version: 1, days };
 }
 
 export function loadLedger(path: string): TokenLedger {
@@ -194,7 +196,7 @@ export function loadLedger(path: string): TokenLedger {
 export function serializeLedger(ledger: TokenLedger): string {
   const sorted: TokenLedger['days'] = {};
   for (const date of Object.keys(ledger.days).sort()) sorted[date] = ledger.days[date];
-  return JSON.stringify({ version: 1, days: sorted }, null, 1) + '\n';
+  return JSON.stringify({ version: 1, days: sorted, ...(ledger.totals ? { totals: ledger.totals } : {}) }, null, 1) + '\n';
 }
 
 export async function collectTokens(
@@ -202,10 +204,11 @@ export async function collectTokens(
   home: string,
   timezone: string,
   log: (message: string) => void = () => {},
+  totals?: TokenTotals,
 ): Promise<{ ledger: TokenLedger; scan: ScanResult }> {
   const path = join(home, 'token-ledger.json');
   const scan = await scanLogs(roots, home, log);
-  const ledger = mergeLedgers(loadLedger(path), ledgerFromEvents(scan.events, timezone));
+  const ledger = mergeLedgers(loadLedger(path), { ...ledgerFromEvents(scan.events, timezone), totals });
   writeFileSync(path, serializeLedger(ledger));
   return { ledger, scan };
 }

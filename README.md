@@ -22,7 +22,7 @@ Each card leads with a five-line summary, which is all a pinned gist shows. The 
 
 | | On your machine | From a fork, with GitHub Actions |
 |---|---|---|
-| **Cards** | All seven | Six, without the AI token trace, because your AI logs are local |
+| **Cards** | All seven | Six, without the AI token trace, because it reads tools on your machine |
 | **Needs** | Node 22.18+ and the [GitHub CLI](https://cli.github.com) | A GitHub account and a personal access token |
 | **Updates** | While your machine is on | Every 6 hours, on GitHub's servers |
 
@@ -103,8 +103,8 @@ It also corrects for some other common distortions:
 
 - **Languages** are ranked by lines you added, not repo bytes. Bytes can't tell an imported SDK or notebook outputs from code you wrote: the same account ranks C first at 47% by bytes, because of a few large imports, and TypeScript first by lines.
 - **Churn** leaves out lockfiles, vendored and generated code, merge commits and bulk imports (a single commit over 20,000 lines). Docs and config are reported separately, and everything excluded is listed on the card.
-- **Tokens** are counted once per model response. Claude Code logs about half of its rows more than once, and naive totals double-count them.
-- **Token history** survives log cleanup. Claude Code deletes old logs, so daily totals are kept in a ledger that only ever grows.
+- **Token totals** come from each tool's own record, because Claude Code deletes transcripts after 30 days by default and logs only cover one machine. Claude Code's lifetime statistics and Codex's account total (the figure behind `/usage`) both outlive those logs. On one real account, the logs alone showed 24.9B tokens against a real 67B.
+- **Tokens from logs** are counted once per model response. Claude Code logs about half of its rows more than once, and Codex's per-thread totals include what a forked thread inherits: summing those gave 281B for 16B of use.
 
 ## What gets published
 
@@ -113,7 +113,7 @@ The cards are public, because only public gists can be pinned. They contain aggr
 | Published | Never published |
 |---|---|
 | Totals per language, month, hour and model | Private repository and organization names |
-| Daily token totals per model | Prompts, code, commit messages, file paths |
+| Daily token totals, and lifetime totals per tool and model | Prompts, code, commit messages, file paths |
 | AI assistants and bots you co-author with | Email addresses |
 | `@login` of people co-authoring in **public** repos, with those public commits only | People who co-author only in private repos, who become an anonymous count unless you list them in `namedCoauthors` or `agentCoauthors` |
 
@@ -182,9 +182,9 @@ Other environment variables:
 - **Default branches only.** Commits still on other branches aren't walked, which matches how GitHub counts contributions. The contributions card shows the gap against your graph total.
 - **Co-authored commits you didn't author** aren't walked. The co-author card covers trailers on your own commits.
 - **Churn reads the first 300 files of a commit**, which is what one API page returns.
-- **AI tools:** only Claude Code and Codex logs are read today.
-- **Multiple machines:** the token ledger keeps the higher figure per day and model rather than adding machines together, so a day used on two machines is under-counted.
-- **Costs** use [LiteLLM's public price list](https://github.com/BerriAI/litellm). A model it doesn't list is left out of the cost and named on the card, and subscription plans pay differently.
+- **AI tools:** only Claude Code and Codex are read today.
+- **Token totals have different reach:** Codex's is your whole account. Claude Code's covers one machine, and its statistics file isn't a public format, so a future version could change it. If it does, the card falls back to the last known total and to logs.
+- **Costs** use [LiteLLM's public price list](https://github.com/BerriAI/litellm). They're a minimum: tokens without a known model or price are left out, such as Codex usage outside your local logs. Subscription plans pay differently.
 - **Dark mode** in the SVG follows the viewer's OS setting, not GitHub's theme toggle.
 - **Platforms:** CI covers Linux, and development happens on macOS. Windows is untested, and `schedule` doesn't support it.
 

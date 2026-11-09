@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, platform } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadConfig, type Config } from './config.ts';
@@ -25,6 +25,7 @@ import { DASHBOARD_FILE, HUB_FILE, LEDGER_FILE, renderHub, renderPreview, type H
 import { renderDashboard } from './render/svg.ts';
 import { collectTokens, defaultLogRoots, discoverLogs, loadLedger, mergeLedgers, serializeLedger } from './tokens/ledger.ts';
 import { loadPrices } from './tokens/pricing.ts';
+import { collectToolTotals, readClaudeStats, readCodexAccount } from './tokens/totals.ts';
 import type { Snapshot, TokenLedger } from './types.ts';
 
 const USAGE = `oh-my-gist: the ultimate pinned-gist profile
@@ -96,7 +97,8 @@ async function collect(config: Config, flags: Flags): Promise<void> {
   }
   if (!flags.githubOnly) {
     console.error('Scanning AI usage logs');
-    const { scan } = await collectTokens(defaultLogRoots(), config.home, config.timezone, log);
+    const totals = await collectToolTotals(log);
+    const { scan } = await collectTokens(defaultLogRoots(), config.home, config.timezone, log, totals);
     log(`done: ${scan.events.length} model responses from ${scan.files} log files${scan.failed ? ` (${scan.failed} unreadable)` : ''}`);
   }
 }
@@ -277,6 +279,12 @@ async function doctor(config: Config): Promise<void> {
   };
   console.log(`\nAI logs    Claude Code: ${describeLogs('claude')}`);
   console.log(`           Codex:       ${describeLogs('codex')}`);
+
+  const claudeStats = readClaudeStats();
+  const codexAccount = await readCodexAccount();
+  const figure = (total: number | undefined) => (total ? `${(total / 1e9).toFixed(2)}B tokens` : 'unavailable, so logs are used');
+  console.log(`\nLifetime   Claude Code statistics: ${figure(claudeStats?.total)}`);
+  console.log(`           Codex account:          ${figure(codexAccount?.total)}`);
 }
 
 const PLIST_LABEL = 'dev.oh-my-gist.refresh';
@@ -308,7 +316,8 @@ function schedule(config: Config, flags: Flags): void {
     return;
   }
   const logFile = join(config.home, 'schedule.log');
-  const path = `${dirname(process.execPath)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`;
+  // Keep the installer's PATH: launchd's own lacks `gh` and `codex`.
+  const path = [dirname(process.execPath), process.env.PATH, '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin'].filter(Boolean).join(':').replace(/&/g, '&amp;').replace(/</g, '&lt;');
   // A scheduled job never creates public gists, and a deleted card stays deleted.
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

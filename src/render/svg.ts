@@ -130,8 +130,9 @@ function headerSection(github: GitHubMetrics): Section {
   const tileWidth = 150;
   const startX = INNER - tileWidth * tiles.length - 18 * (tiles.length - 1);
   let body = text(0, 22, `@${github.login}`, 'h1');
-  body += text(0, 92, commas(counts.attributed), 'hero');
-  body += text(0, 118, `contributions across ${commas(github.coverage.reposWithCommits)} repos and ${github.pulse.organizations} orgs`, 'note');
+  body += text(0, 92, commas(counts.calendar), 'hero');
+  body += text(0, 118, 'contributions on the GitHub graph, all-time', 'note');
+  body += text(0, 136, `${commas(counts.attributed)} itemized across ${commas(github.coverage.reposWithCommits)} repos and ${github.pulse.organizations} orgs`, 'note');
   tiles.forEach(([label, value, series], index) => {
     const x = startX + index * (tileWidth + 18);
     body += text(x, 22, label, 'label');
@@ -139,7 +140,7 @@ function headerSection(github: GitHubMetrics): Section {
     body += miniBars(x, 72, series, tileWidth, 34);
     body += text(x, 122, '12 months', 'axis');
   });
-  return { height: 132, body };
+  return { height: 142, body };
 }
 
 function rhythmSection(github: GitHubMetrics, timezone: string): Section {
@@ -282,15 +283,17 @@ function churnSection(github: GitHubMetrics): Section {
 }
 
 function tokensSection(tokens: TokenMetrics): Section {
+  const toolLabel: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
+  const reach = { machine: 'on this machine', account: 'across the account', logs: 'from local logs' };
+  const isMinimum = tokens.unpricedModels.length > 0 || tokens.unattributed > 0;
   const tileItems: [string, string][] = [
     ['Total tokens', compact(tokens.total)],
-    ['Uncached', compact(tokens.fresh)],
-    ['Output', compact(tokens.output)],
+    ...tokens.tools.slice(0, 2).map((row): [string, string] => [toolLabel[row.tool] ?? row.tool, compact(row.total)]),
     ['Cache hit rate', percent(tokens.cacheShare, 1)],
-    ['At API list price', `${tokens.unpricedModels.length ? '≥' : '≈'}${money(tokens.cost)}`],
+    ['At API list price', `${isMinimum ? '≥' : '≈'}${money(tokens.cost)}`],
   ];
   let body = text(0, 14, 'AI token trace', 'h1');
-  body += text(0, 32, `${commas(tokens.messages)} model responses since ${tokens.firstDay}, from local Claude Code and Codex logs`, 'note');
+  body += text(0, 32, tokens.tools.map((row) => `${toolLabel[row.tool] ?? row.tool} ${reach[row.scope]}`).join(', '), 'note');
   const tileWidth = INNER / tileItems.length;
   tileItems.forEach(([label, value], index) => {
     body += text(index * tileWidth, 66, value, 'tile-value');
@@ -302,7 +305,6 @@ function tokensSection(tokens: TokenMetrics): Section {
   const spare = ['c3', 'c4'];
   const toolNames = tokens.tools.map((tool) => tool.tool).sort();
   const fillOf = (tool: string) => TOOL_FILLS[tool] ?? spare[Math.max(0, toolNames.indexOf(tool)) % spare.length];
-  const toolLabel: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
   body += text(0, 120, 'Tokens per day, last 60 days', 'label');
   body += legend(
     INNER - toolNames.length * 110,

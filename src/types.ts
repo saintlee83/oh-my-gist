@@ -116,10 +116,30 @@ export interface Snapshot {
 /** [input, output, cacheRead, cacheWrite, messages] */
 export type UsageTuple = [number, number, number, number, number];
 
+/** [input, output, cacheRead, cacheWrite] */
+export type TokenBreakdown = [number, number, number, number];
+
+/** A lifetime figure reported by a tool itself, which outlives deleted logs. */
+export interface ToolTotals {
+  /** 'machine' covers this computer. 'account' covers every device on the account. */
+  scope: 'machine' | 'account';
+  total: number;
+  /** The last date the figure covers. Newer usage is added from logs. */
+  asOf: string | null;
+  /** Lifetime usage per model, when the tool reports it. */
+  models?: Record<string, TokenBreakdown>;
+  /** Tokens per day, when the tool reports them. */
+  daily?: Record<string, number>;
+}
+
+export type TokenTotals = Record<string, ToolTotals>;
+
 export interface TokenLedger {
   version: 1;
   /** date -> "tool/model" -> usage. Aggregated, so it is safe to publish. */
   days: Record<string, Record<string, UsageTuple>>;
+  /** tool -> lifetime figure. Also aggregated. */
+  totals?: TokenTotals;
 }
 
 export interface Price {

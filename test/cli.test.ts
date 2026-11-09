@@ -267,6 +267,22 @@ test('--github-only keeps token data from the published ledger, as CI must', asy
   assert.match(hub.files['dashboard.svg'].content, /AI token trace/);
 });
 
+test('tool totals are published and survive CI runs, which have no local tools', async () => {
+  const laptop = makeHome();
+  const ledger = { version: 1, days: {}, totals: { codex: { scope: 'account', total: 26_300_000_000, asOf: null } } };
+  writeFileSync(join(laptop, 'token-ledger.json'), JSON.stringify(ledger));
+  await cli(laptop, 'publish', '--yes');
+  const tokens = github.find('oh-my-gist-tokens.txt') as StoredGist;
+  assert.equal(JSON.parse(tokens.files['tokens-ledger.json'].content).totals.codex.total, 26_300_000_000);
+  assert.match(tokens.description, /26\.3B/);
+
+  const result = await cli(makeHome({ snapshot: true, ledger: false }), 'publish', '--github-only');
+  assert.equal(result.code, 0, result.output);
+  const hub = github.find('00-oh-my-gist.md') as StoredGist;
+  assert.match(hub.files['00-oh-my-gist.md'].content, /AI token trace: 26\.3B/);
+  assert.match(hub.files['dashboard.svg'].content, /26\.3B/);
+});
+
 test('a machine that lost its ledger recovers history from the published copy', async () => {
   const home = makeHome();
   await cli(home, 'publish', '--yes');
