@@ -8,7 +8,7 @@ The ultimate gist profile for hackers. It traces your real activity across perso
 
 | Card | What it traces |
 |---|---|
-| ⚡ **Contributions** | Commits, PRs, code reviews and issues: all-time, this year, 12-month trend, by year and by where |
+| ⚡ **Contributions** | Commits, PRs, code reviews and issues: this year, lifetime, 12-month trend, by year and by where |
 | 🕒 **Coding rhythm** | Morning, daytime, evening and night, plus a weekday-by-hour punchcard |
 | 🧬 **Top languages** | Every language you wrote, split across personal repos, orgs and gists |
 | ± **Language churn** | Lines added and removed per language, as a diverging chart |
