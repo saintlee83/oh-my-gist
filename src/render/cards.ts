@@ -44,10 +44,10 @@ function contributionsCard(github: GitHubMetrics): Card {
   const { counts, thisYear, monthly } = github;
   const year = String(thisYear.year);
   const row = (label: string, total: number, current: number, series: number[]) =>
-    `${padEnd(label, 13)}${padStart(commas(total), 7)}${padStart(commas(current), 7)}  ${sparkline(series)}`;
+    `${padEnd(label, 13)}${padStart(commas(current), 7)}${padStart(commas(total), 9)}  ${sparkline(series)}`;
 
   const hero = [
-    `${padEnd('', 13)}${padStart('total', 7)}${padStart(year, 7)}  last 12 months`,
+    `${padEnd('', 13)}${padStart(year, 7)}${padStart('lifetime', 9)}  last 12 months`,
     row('Commits', counts.commits, thisYear.commits, monthly.commits),
     row('Pull requests', counts.pulls, thisYear.pulls, monthly.pulls),
     row('Code reviews', counts.reviews, thisYear.reviews, monthly.reviews),
@@ -88,14 +88,14 @@ function contributionsCard(github: GitHubMetrics): Card {
     'HOW THIS IS COUNTED',
     'Commits are walked repo by repo on the default branch, because GitHub hides',
     'the breakdown of private work from its contribution API.',
-    `Your GitHub graph shows ${commas(counts.calendar)}; ${commas(counts.attributed)} are itemized above. The rest is activity`,
+    `Your GitHub graph shows ${commas(thisYear.calendar)} in ${year} and ${commas(counts.calendar)} lifetime; ${commas(counts.attributed)} are itemized. The rest is activity`,
     'GitHub counts but does not list per repo, such as work in repositories that were',
     'later deleted or rewritten. Code reviews are PRs by other people that you reviewed.',
   ];
 
   return {
     key: 'contributions',
-    title: `⚡ Contributions: ${compact(counts.calendar)} on the GitHub graph`,
+    title: `⚡ Contributions: ${compact(thisYear.calendar)} in ${year} · ${compact(counts.calendar)} lifetime`,
     filename: 'oh-my-gist-contributions.txt',
     hero,
     details,

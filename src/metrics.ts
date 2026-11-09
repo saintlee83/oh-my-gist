@@ -102,7 +102,8 @@ export interface GitHubMetrics {
     calendar: number;
     attributed: number;
   };
-  thisYear: { year: number; commits: number; pulls: number; issues: number; reviews: number };
+  /** `calendar` is the year's total on the GitHub graph, including what can't be itemized. */
+  thisYear: { year: number; commits: number; pulls: number; issues: number; reviews: number; calendar: number };
   months: string[];
   monthly: { commits: number[]; pulls: number[]; issues: number[]; reviews: number[] };
   years: { year: number; commits: number; pulls: number; issues: number; reviews: number; calendar: number; hidden: number }[];
@@ -426,7 +427,13 @@ export function computeGitHub(snapshot: Snapshot, timezone: string, now: Date, o
     login: snapshot.login,
     memberSince: snapshot.memberSince,
     counts,
-    thisYear: { year: today.year, ...thisYear },
+    thisYear: {
+      year: today.year,
+      ...thisYear,
+      calendar: snapshot.calendar
+        .filter((day) => day.date.startsWith(`${today.year}-`))
+        .reduce((sum, day) => sum + day.count, 0),
+    },
     months,
     monthly,
     years,

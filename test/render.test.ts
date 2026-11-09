@@ -173,19 +173,31 @@ test('a token card alone renders without GitHub data', () => {
   assert.match(cards[0].details.join('\n'), /No public price for: an-unpriced-model, fourth-model/);
 });
 
-test('the headline matches the GitHub graph, with the itemized part labelled', () => {
+test('the headline is this year on the GitHub graph, with lifetime beneath it', () => {
+  const commit = (oid: string, at: string) => ({ oid, at, scope: 'org' as const, add: 0, del: 0, merge: false, ai: null, kind: null });
   const snapshot = emptySnapshot({
     calendar: [
+      { date: '2025-12-31', count: 361 },
       { date: '2026-09-01', count: 1933 },
       { date: '2026-10-01', count: 1202 },
     ],
-    commits: [{ oid: 'a', at: '2026-09-01T00:00:00Z', scope: 'org', add: 0, del: 0, merge: false, ai: null, kind: null }],
+    commits: [commit('old', '2025-06-01T00:00:00Z'), commit('a', '2026-09-01T00:00:00Z'), commit('b', '2026-09-02T00:00:00Z')],
   });
   const metrics = computeMetrics(snapshot, null, {}, TZ, NOW);
+  assert.equal(metrics.github?.thisYear.calendar, 3135);
+  assert.equal(metrics.github?.counts.calendar, 3496);
+
   const svg = renderDashboard(metrics);
-  assert.ok(svg.includes('>3,135</text>'), 'the graph total is the headline');
-  assert.ok(svg.includes('1 itemized across'));
-  assert.equal(buildCards(metrics)[0].title, '⚡ Contributions: 3.1k on the GitHub graph');
+  assert.ok(svg.includes('>3,135</text>'), 'this year is the headline');
+  assert.ok(svg.includes('contributions in 2026'));
+  assert.ok(svg.includes('3,496 lifetime contributions'));
+  assert.ok(svg.includes('>2</text>'), 'tiles lead with this year too');
+  assert.ok(svg.includes('3 lifetime · 12 months'));
+
+  const [card] = buildCards(metrics);
+  assert.equal(card.title, '⚡ Contributions: 3.1k in 2026 · 3.5k lifetime');
+  assert.match(card.hero[0], /2026 +lifetime +last 12 months/);
+  assert.match(card.hero[1], /^Commits +2 +3 /);
 });
 
 test('the dashboard is well-formed and escapes text', () => {

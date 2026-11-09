@@ -120,27 +120,28 @@ function miniBars(x: number, y: number, values: number[], width: number, height:
 }
 
 function headerSection(github: GitHubMetrics): Section {
-  const { counts, monthly } = github;
-  const tiles: [string, number, number[]][] = [
-    ['Commits', counts.commits, monthly.commits],
-    ['Pull requests', counts.pulls, monthly.pulls],
-    ['Code reviews', counts.reviews, monthly.reviews],
-    ['Issues', counts.issues, monthly.issues],
+  const { counts, monthly, thisYear } = github;
+  const tiles: [string, number, number, number[]][] = [
+    ['Commits', thisYear.commits, counts.commits, monthly.commits],
+    ['Pull requests', thisYear.pulls, counts.pulls, monthly.pulls],
+    ['Code reviews', thisYear.reviews, counts.reviews, monthly.reviews],
+    ['Issues', thisYear.issues, counts.issues, monthly.issues],
   ];
   const tileWidth = 150;
   const startX = INNER - tileWidth * tiles.length - 18 * (tiles.length - 1);
   let body = text(0, 22, `@${github.login}`, 'h1');
-  body += text(0, 92, commas(counts.calendar), 'hero');
-  body += text(0, 118, 'contributions on the GitHub graph, all-time', 'note');
-  body += text(0, 136, `${commas(counts.attributed)} itemized across ${commas(github.coverage.reposWithCommits)} repos and ${github.pulse.organizations} orgs`, 'note');
-  tiles.forEach(([label, value, series], index) => {
+  body += text(0, 92, commas(thisYear.calendar), 'hero');
+  body += text(0, 118, `contributions in ${thisYear.year}`, 'note');
+  body += text(0, 136, `${commas(counts.calendar)} lifetime contributions`, 'note');
+  body += text(0, 154, `across ${commas(github.coverage.reposWithCommits)} repos and ${github.pulse.organizations} orgs`, 'note');
+  tiles.forEach(([label, value, lifetime, series], index) => {
     const x = startX + index * (tileWidth + 18);
     body += text(x, 22, label, 'label');
     body += text(x, 58, commas(value), 'tile-value');
     body += miniBars(x, 72, series, tileWidth, 34);
-    body += text(x, 122, '12 months', 'axis');
+    body += text(x, 122, `${commas(lifetime)} lifetime · 12 months`, 'axis');
   });
-  return { height: 142, body };
+  return { height: 160, body };
 }
 
 function rhythmSection(github: GitHubMetrics, timezone: string): Section {
