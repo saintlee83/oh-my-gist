@@ -1,0 +1,4 @@
+node_modules/
+out/
+.omg-state/
+.DS_Store

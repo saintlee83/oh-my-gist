@@ -1,0 +1,13 @@
+{
+  "timezone": "auto",
+  "public": true,
+  "excludeLanguages": [],
+  "namedCoauthors": [],
+  "agentCoauthors": [],
+  "churn": {
+    "maxRequestsPerRun": 4000,
+    "maxFileLines": 5000,
+    "maxCommitLines": 20000,
+    "concurrency": 8
+  }
+}
