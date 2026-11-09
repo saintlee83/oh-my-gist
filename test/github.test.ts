@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Config } from '../src/config.ts';
 import { collectChurn, type ChurnCache, type ChurnTarget } from '../src/github/churn.ts';
-import { GitHubClient, GraphQLError, RateLimitExhausted } from '../src/github/client.ts';
+import { GitHubClient, GraphQLError, MissingScopes, RateLimitExhausted, redactQuoted } from '../src/github/client.ts';
 import { aiLabel, tallyCoauthors, type CoauthorEvent } from '../src/github/coauthors.ts';
 import { aggregateLanguages, collectGitHub, countLines } from '../src/github/collect.ts';
 import {
@@ -66,6 +66,81 @@ test('GraphQL field errors surface with partial data', async () => {
     assert.deepEqual(error.partial, { a: 1 });
     return true;
   });
+});
+
+function clientWithScopes(token: string, scopes: string | null): GitHubClient {
+  const headers: Record<string, string> = scopes === null ? {} : { 'x-oauth-scopes': scopes };
+  return new GitHubClient(token, {
+    fetchImpl: (async () => new Response('{}', { status: 200, headers })) as typeof fetch,
+    sleep: async () => {},
+  });
+}
+
+test('required scopes are checked for classic tokens', async () => {
+  const required = ['repo', 'read:org', 'gist'];
+  const check = async (token: string, scopes: string | null) => {
+    const client = clientWithScopes(token, scopes);
+    await client.rest('/x');
+    return client.missingScopes(required);
+  };
+  assert.deepEqual(await check('ghp_x', 'gist, read:org, repo, workflow'), []);
+  assert.deepEqual(await check('gho_x', 'gist'), ['repo', 'read:org']);
+  assert.deepEqual(await check('ghp_x', ''), required, 'a classic token with no scopes lacks them all');
+  assert.deepEqual(await check('ghp_x', 'repo, gist, admin:org'), [], 'admin:org includes read:org');
+  assert.deepEqual(await check('github_pat_x', ''), [], 'fine-grained tokens cannot be checked');
+  assert.deepEqual(await check('ghp_x', null), [], 'no header means nothing to check');
+});
+
+test('quoted names are removed from errors bound for public logs', () => {
+  assert.equal(
+    redactQuoted(`GitHub GraphQL: Could not resolve to an Organization with the login of 'stealth-org'.`),
+    `GitHub GraphQL: Could not resolve to an Organization with the login of '[redacted]'.`,
+  );
+  assert.equal(redactQuoted('GitHub 404: Not Found'), 'GitHub 404: Not Found');
+});
+
+test('a token that cannot see private work stops collection before it starts', async () => {
+  const queries: string[] = [];
+  const client = new GitHubClient('ghp_underscoped', {
+    fetchImpl: (async (_: unknown, init?: RequestInit) => {
+      queries.push(String(init?.body));
+      return new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              id: 'U1',
+              login: 'octo',
+              createdAt: '2020-01-01T00:00:00Z',
+              followers: { totalCount: 0 },
+              issueComments: { totalCount: 0 },
+              repositoryDiscussions: { totalCount: 0 },
+              organizations: { totalCount: 0, nodes: [] },
+              contributionsCollection: { contributionYears: [2026] },
+            },
+          },
+        }),
+        { status: 200, headers: { 'x-oauth-scopes': 'gist' } },
+      );
+    }) as typeof fetch,
+    sleep: async () => {},
+  });
+  const home = mkdtempSync(join(tmpdir(), 'omg-test-'));
+  const config: Config = {
+    timezone: 'UTC',
+    public: true,
+    home,
+    outDir: join(home, 'out'),
+    excludeLanguages: [],
+    namedCoauthors: [],
+    agentCoauthors: [],
+    churn: { maxRequestsPerRun: 10, maxFileLines: 5000, maxCommitLines: 20000, concurrency: 1 },
+  };
+  await assert.rejects(collectGitHub(client, config, () => {}), (error: unknown) => {
+    assert.ok(error instanceof MissingScopes);
+    assert.deepEqual(error.missing, ['repo', 'read:org']);
+    return true;
+  });
+  assert.equal(queries.length, 1, 'stopped right after reading the profile');
 });
 
 function targets(count: number): ChurnTarget[] {

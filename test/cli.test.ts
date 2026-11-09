@@ -24,6 +24,8 @@ interface StoredGist {
 class MockGitHub {
   gists = new Map<string, StoredGist>();
   writes: { method: string; id: string }[] = [];
+  /** Sent as x-oauth-scopes when set, the way GitHub does for classic tokens. */
+  scopes: string | null = null;
   private server: Server | null = null;
   private counter = 0;
   url = '';
@@ -34,7 +36,10 @@ class MockGitHub {
       request.on('data', (chunk) => (body += chunk));
       request.on('end', () => {
         const send = (status: number, data: unknown) => {
-          response.writeHead(status, { 'content-type': 'application/json' });
+          response.writeHead(status, {
+            'content-type': 'application/json',
+            ...(this.scopes === null ? {} : { 'x-oauth-scopes': this.scopes }),
+          });
           response.end(JSON.stringify(data));
         };
         const path = (request.url ?? '').split('?')[0];
@@ -84,6 +89,7 @@ class MockGitHub {
   reset() {
     this.gists.clear();
     this.writes = [];
+    this.scopes = null;
   }
 }
 
@@ -125,6 +131,14 @@ test('publishing needs --yes and writes nothing without it', async () => {
   assert.equal(result.code, 1);
   assert.match(result.output, /Nothing was published/);
   assert.equal(github.writes.length, 0);
+});
+
+test('a token that cannot write gists stops before any write', async () => {
+  github.scopes = 'repo, read:org';
+  const result = await cli(makeHome(), 'publish', '--yes');
+  assert.equal(result.code, 1);
+  assert.match(result.output, /missing the gist scope/);
+  assert.deepEqual(github.writes, []);
 });
 
 test('a dry run writes nothing, even with --yes', async () => {

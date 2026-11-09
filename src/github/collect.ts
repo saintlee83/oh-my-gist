@@ -541,6 +541,8 @@ export function aggregateLanguages(
 export async function collectGitHub(client: GitHubClient, config: Config, log: Log, now = new Date()): Promise<Snapshot> {
   log('profile and contribution calendar');
   const viewer = await collectViewer(client);
+  // A token without these sees only public work and raises no error at all.
+  client.assertScopes(['repo', 'read:org']);
   const login = viewer.login;
   const orgLogins = viewer.organizations.nodes.map((org) => org.login);
   const orgSet = new Set(orgLogins.map((name) => name.toLowerCase()));
